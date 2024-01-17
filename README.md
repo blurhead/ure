@@ -1,2 +1,2 @@
 # myre
-A Library To Extend `re`.
+A Extension For Official Library `re`.

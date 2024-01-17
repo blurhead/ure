@@ -13,7 +13,7 @@ from typing import (
 
 @runtime_checkable
 class MatchLike(Protocol):
-    def group(self, index: int = 0) -> Optional[str]:
+    def group(self, index: int = 0) -> str:
         ...
 
     def groups(self) -> Tuple[Optional[str], ...]:

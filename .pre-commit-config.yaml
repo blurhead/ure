@@ -1,0 +1,41 @@
+default_stages: [ commit ]
+fail_fast: true
+
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-format
+        name: ruff-format
+        entry: ruff format
+        language: system
+        types: [ python ]
+        description: "Ruff code formatter"
+
+      - id: ruff-check
+        name: ruff-check
+        description: "Ruff code checker"
+        entry: ruff check --force-exclude
+        args: [ --fix, --exit-non-zero-on-fix ]
+        language: system
+        types: [ python ]
+
+      - id: commitizen
+        name: commitizen
+        entry: commitizen
+        language: system
+        types: [ python ]
+        stages: [commit-msg]
+
+      - id: mypy
+        name: mypy
+        entry: mypy --install-types --non-interactive
+        types: [ python ]
+        args: [ ]
+        language: system
+
+      - id: pytest
+        name: pytest
+        entry: pytest
+        types: [ python ]
+        language: system
+        pass_filenames: false
