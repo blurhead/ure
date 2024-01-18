@@ -140,6 +140,7 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+.ruff_cache/
 .dmypy.json
 dmypy.json
 
@@ -160,4 +161,5 @@ cython_debug/
 #.idea/
 .idea/
 .vscode/
+.fleet/
 poetry.lock
