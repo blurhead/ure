@@ -1,24 +1,27 @@
+from __future__ import annotations
+
 import re
 from typing import (
     Any,
+    AnyStr,
     Dict,
     Iterator,
     List,
+    Literal,
     Optional,
+    Pattern,
     Protocol,
     Tuple,
+    TypeVar,
+    overload,
     runtime_checkable,
 )
 
+_T = TypeVar("_T")
+
 
 @runtime_checkable
-class MatchLike(Protocol):
-    def group(self, index: int = 0) -> str:
-        ...
-
-    def groups(self) -> Tuple[Optional[str], ...]:
-        ...
-
+class MatchLike(Protocol[AnyStr]):
     def start(self, group: int = 0) -> int:
         ...
 
@@ -26,6 +29,29 @@ class MatchLike(Protocol):
         ...
 
     def span(self, group: int = 0) -> Tuple[int, int]:
+        ...
+
+    @property
+    def re(self) -> Pattern[AnyStr]:
+        ...
+
+    @overload
+    def group(self, __group: Literal[0] = 0) -> AnyStr:
+        ...
+
+    @overload
+    def group(self, __group: str | int) -> AnyStr | Any:
+        ...
+
+    def group(self, __group: str | int = 0) -> AnyStr | Any:
+        ...
+
+    @overload
+    def groups(self) -> tuple[AnyStr | Any, ...]:
+        ...
+
+    @overload
+    def groups(self, default: _T) -> tuple[AnyStr | _T, ...]:
         ...
 
 

@@ -163,3 +163,4 @@ cython_debug/
 .vscode/
 .fleet/
 poetry.lock
+.python-version
