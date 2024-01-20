@@ -68,9 +68,7 @@ class MatchAny:
                     break
             if isinstance(matcher, OffsetMatch):
                 matcher = matcher._match
-            elif isinstance(matcher, re.Match):
-                pass
-            else:
+            elif not isinstance(matcher, re.Match):
                 raise TypeError(f"{matcher} is not a valid match")
             return OffsetMatch(matcher, start - matcher.start(), end - matcher.end())
 

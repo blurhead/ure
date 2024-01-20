@@ -5,7 +5,7 @@ license = "MIT"
 name = "myre"
 readme = "README.md"
 repository = "https://github.com/blurhead/myre"
-version = "0.0.3"
+version = "0.0.4"
 
 [[tool.poetry.source]]
 name = "default"
