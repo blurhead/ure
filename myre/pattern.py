@@ -2,6 +2,7 @@ import heapq
 import re
 import sys
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Any, Iterator, List, NamedTuple, Optional, Pattern, Set, Tuple, cast
 
 from typing_extensions import Self
@@ -29,19 +30,44 @@ class Scope(NamedTuple):
 
 
 @dataclass
+class TextCleaner:
+    pattern: Pattern
+
+    @cached_property
+    def scopes(self) -> List[Scope]:
+        return []
+
+    def replace(self, string: str, pos: int, endpos: int) -> str:
+        for match in self.pattern.finditer(string, pos, endpos):
+            scope = Scope(*match.span())
+            string = string[: scope.start] + string[scope.end :]
+            self.scopes.append(scope)
+        return string
+
+    def restore(self, matcher: MatchLike) -> OffsetMatch:
+        start, end = matcher.start(), matcher.end()
+        for s, e in self.scopes:
+            if s <= start:
+                start += e - s
+            if s < end:
+                end += e - s
+            else:
+                break
+        if isinstance(matcher, OffsetMatch):
+            matcher = matcher._match
+        elif not isinstance(matcher, re.Match):
+            raise TypeError(f"{matcher} is not a valid match")
+        return OffsetMatch(matcher, start - matcher.start(), end - matcher.end())
+
+
+@dataclass
 class MatchAny:
     patterns: Tuple[PatternLike, ...]
     janitor: Pattern
 
-    def _sanitize(self, string: str, pos: int, endpos: int) -> Iterator[Scope]:
-        for match in self.janitor.finditer(string, pos, endpos):
-            yield Scope(*match.span())
-
     def finditer(self, string: str, pos: int = 0, endpos: int = sys.maxsize) -> Iterator[OffsetMatch]:
-        scopes = []
-        for start, end in self._sanitize(string, pos, endpos):
-            scopes.append(Scope(start, end))
-            string = string[:start] + string[end:]
+        cleaner = TextCleaner(self.janitor)
+        string = cleaner.replace(string, pos, endpos)
 
         pq: List[Tuple[int, MatchLike, Iterator[MatchLike]]] = []
         indices: Set[int] = set()
@@ -57,24 +83,9 @@ class MatchAny:
             except StopIteration:
                 continue
 
-        def restore(matcher: MatchLike) -> OffsetMatch:
-            start, end = matcher.start(), matcher.end()
-            for s, e in scopes:
-                if s <= start:
-                    start += e - s
-                if s < end:
-                    end += e - s
-                else:
-                    break
-            if isinstance(matcher, OffsetMatch):
-                matcher = matcher._match
-            elif not isinstance(matcher, re.Match):
-                raise TypeError(f"{matcher} is not a valid match")
-            return OffsetMatch(matcher, start - matcher.start(), end - matcher.end())
-
         while pq:
             _, matcher, follow = heapq.heappop(pq)
-            yield restore(matcher)
+            yield cleaner.restore(matcher)
             try:
                 matcher = next(follow)
                 if any(i in indices for i in range(*matcher.span())):

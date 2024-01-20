@@ -32,14 +32,7 @@ builtins = ["_"]
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 exclude = ["tests"]
 ignore = [
-  "B008",   # do not perform function calls in argument defaults
-  "C901",   # too complex
-  "B905",   # zip() strict parameter checking
-  "RET503", # missing explicit return
-  "RET504", # unnecessary assignment
-  "RET505", # unnecessary else/elif after return statement
-  "W191",   # indentation contains tabs(ruff will fix it)
-  "E501",   # line too long(ruff will fix it)
+  "E501", # line too long(ruff will fix it)
 ]
 line-length = 120
 select = [
