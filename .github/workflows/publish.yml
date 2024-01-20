@@ -1,0 +1,45 @@
+name: Publish
+
+on:
+  release:
+    types:
+      - created
+
+jobs:
+  build:
+    name: release
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+        poetry-version: ["1.7.1"]
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: "0"
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - uses: abatilo/actions-poetry@v2.1.6
+        with:
+          poetry-version: ${{ matrix.poetry-version }}
+
+      - name: Create Release Branch
+        run: |
+          git checkout -b release/$GITHUB_REF_NAME
+          git push origin release/$GITHUB_REF_NAME
+
+      - name: Install dependencies
+        run: poetry build
+
+      - name: Build and publish package
+        env:
+          PYPI_TOKEN: ${{ secrets.MYRE }}
+        run: |
+          rm -rf dist
+          poetry publish --build --username=__token__ --password=$PYPI_TOKEN
