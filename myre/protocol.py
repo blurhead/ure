@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import re
+import sys
 from typing import (
     Any,
     AnyStr,
-    Dict,
     Iterator,
     List,
     Literal,
@@ -57,35 +56,11 @@ class MatchLike(Protocol[AnyStr]):
 
 @runtime_checkable
 class PatternLike(Protocol):
-    def search(self: "PatternLike", string: str, pos: int, endpos: int) -> Optional[MatchLike]:
+    def search(self: "PatternLike", string: str, pos: int = 0, endpos: int = sys.maxsize) -> Optional[MatchLike]:
         ...
 
-    def match(self, string: str, pos: int, endpos: int) -> Optional[MatchLike]:
+    def findall(self, string: str, pos: int = 0, endpos: int = sys.maxsize) -> List[str]:
         ...
 
-    def fullmatch(self, string: str, pos: int, endpos: int) -> Optional[MatchLike]:
-        ...
-
-    def findall(self, string: str, pos: int, endpos: int) -> List[str]:
-        ...
-
-    def finditer(self, string: str, pos: int, endpos: int) -> Iterator[MatchLike]:
-        ...
-
-    def sub(self, repl: Any, string: str, count: int) -> str:
-        ...
-
-    def subn(self, repl: Any, string: str, count: int) -> Tuple[str, int]:
-        ...
-
-    def split(self, string: str, maxsplit: int) -> List[str]:
-        ...
-
-    def flags(self) -> re.RegexFlag:
-        ...
-
-    def groupindex(self) -> Dict[str, int]:
-        ...
-
-    def pattern(self) -> str:
+    def finditer(self, string: str, pos: int = 0, endpos: int = sys.maxsize) -> Iterator[MatchLike]:
         ...

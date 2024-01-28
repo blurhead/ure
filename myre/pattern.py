@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 import heapq
 import re
 import sys
-from dataclasses import dataclass
+from copy import deepcopy
+from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Any, Iterator, List, NamedTuple, Optional, Pattern, Set, Tuple, cast
+from typing import Any, Iterator, List, NamedTuple, Optional, Set, Tuple, cast
 
 from typing_extensions import Self
 
@@ -30,14 +33,14 @@ class Scope(NamedTuple):
 
 
 @dataclass
-class TextCleaner:
-    pattern: Pattern
+class Trimmer:
+    pattern: PatternLike
 
     @cached_property
     def scopes(self) -> List[Scope]:
         return []
 
-    def replace(self, string: str, pos: int, endpos: int) -> str:
+    def remove(self, string: str, pos: int, endpos: int) -> str:
         for match in self.pattern.finditer(string, pos, endpos):
             scope = Scope(*match.span())
             string = string[: scope.start] + string[scope.end :]
@@ -60,15 +63,49 @@ class TextCleaner:
         return OffsetMatch(matcher, start - matcher.start(), end - matcher.end())
 
 
+_MATCH_NONE = re.compile(r"(?!.?)")
+_MATCH_ALL = re.compile(r".?")
+
+
 @dataclass
-class MatchAny:
-    patterns: Tuple[PatternLike, ...]
-    janitor: Pattern
+class Base:
+    p_trim: PatternLike = field(init=False, default=_MATCH_NONE)
+    p_deny: PatternLike = field(init=False, default=_MATCH_NONE)
+
+    def __and__(self, other: Any) -> PatternLike:
+        return MatchALL.compile(self, other)
+
+    def __or__(self, other: Any) -> PatternLike:
+        return MatchAny.compile(self, other)
+
+    def __sub__(self, other: Any) -> PatternLike:
+        new = deepcopy(self)
+        new.p_deny = MatchAny.compile(self.p_deny, other)
+        return new
+
+    def findnext(self, string: str, pos: int = 0, endpos: int = sys.maxsize) -> Iterator[MatchLike]:
+        raise NotImplementedError
 
     def finditer(self, string: str, pos: int = 0, endpos: int = sys.maxsize) -> Iterator[OffsetMatch]:
-        cleaner = TextCleaner(self.janitor)
-        string = cleaner.replace(string, pos, endpos)
+        trimmer = Trimmer(self.p_trim)
+        string = trimmer.remove(string, pos, endpos)
+        for match in self.findnext(string, pos, endpos):
+            if self.p_deny.search(match.group()):
+                continue
+            yield trimmer.restore(match)
 
+    def findall(self, string: str, pos: int = 0, endpos: int = sys.maxsize) -> List[str]:
+        return [match.group() for match in self.finditer(string, pos, endpos)]
+
+    def search(self, string: str, pos: int = 0, endpos: int = sys.maxsize) -> Optional[OffsetMatch]:
+        return next(self.finditer(string, pos, endpos), None)
+
+
+@dataclass
+class MatchAny(Base):
+    patterns: Tuple[PatternLike, ...]
+
+    def findnext(self, string: str, pos: int = 0, endpos: int = sys.maxsize) -> Iterator[MatchLike]:
         pq: List[Tuple[int, MatchLike, Iterator[MatchLike]]] = []
         indices: Set[int] = set()
 
@@ -85,7 +122,7 @@ class MatchAny:
 
         while pq:
             _, matcher, follow = heapq.heappop(pq)
-            yield cleaner.restore(matcher)
+            yield matcher
             try:
                 matcher = next(follow)
                 if any(i in indices for i in range(*matcher.span())):
@@ -95,12 +132,23 @@ class MatchAny:
             except StopIteration:
                 continue
 
-    def findall(self, string: str, pos: int = 0, endpos: int = sys.maxsize) -> List[str]:
-        return [match.group() for match in self.finditer(string, pos, endpos)]
-
-    def search(self, string: str, pos: int = 0, endpos: int = sys.maxsize) -> Optional[OffsetMatch]:
-        return next(self.finditer(string, pos, endpos), None)
-
     @classmethod
-    def compile(cls, *patterns: Any, janitor: Any = "^$", flag: int = 0) -> Self:
-        return cls(tuple(_compile(pattern, flag) for pattern in patterns), re.compile(janitor, flag))
+    def compile(cls, *patterns: Any, p_trim: Any = _MATCH_NONE, flag: int = 0) -> Self:
+        self = cls(tuple(_compile(pattern, flag) for pattern in patterns))
+        self.p_trim = _compile(p_trim, flag)
+        return self
+
+
+class MatchALL(MatchAny):
+    def findnext(self, string: str, pos: int = 0, endpos: int = sys.maxsize) -> Iterator[MatchLike]:
+        matches = []
+        matched_patterns = set()
+
+        for matched in super().findnext(string, pos, endpos):
+            matched_patterns.add(matched.re)
+            matches.append(matched)
+
+            if matched_patterns.issuperset(self.patterns):
+                yield from iter(matches)
+                matches = []
+                matched_patterns = set()

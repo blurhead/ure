@@ -57,7 +57,7 @@ class OffsetMatch(Generic[AnyStr]):
         return self._match.expand(template)
 
     def __repr__(self):
-        return f"OffsetMatch(start={self.start()}, end={self.end()}, match={self._match})"
+        return f"<myre.OffsetMatch object; span={self.span()}, match={self.group()})"
 
     def __eq__(self, other: Any):
         if isinstance(other, (MatchLike, re.Match)):
