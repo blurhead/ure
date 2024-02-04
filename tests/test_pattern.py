@@ -1,5 +1,5 @@
 import re
-from myre.pattern import MatchALL, MatchAny
+from myre import MatchALL, MatchAny
 
 
 class TestMatchAny:
