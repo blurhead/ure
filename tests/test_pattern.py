@@ -19,8 +19,8 @@ class TestMatchAny:
             assert self.p1.search(text) == self.p2.search(text)
 
 
-class TestMatchAnyWithTrim:
-    pattern = MatchAny.compile(r"hello", p_trim=r"[$]", flag=re.I)
+class TestMatchAnySub:
+    pattern = MatchAny.compile(r"hello", flag=re.I) - r"[$]"
 
     def test_findall(self):
         for text in [
@@ -37,10 +37,22 @@ class TestMatchAnyWithTrim:
                 assert text[matcher.start() : matcher.end()] == "Hell$o"
 
 
-class TestMatchALL:
-    p1 = MatchALL.compile(r"world", r"hello", flag=re.I)
+class TestMatchAnyXor:
+    pattern = MatchAny.compile(r"h\wllo", flag=re.I) ^ r"ell"
 
     def test_findall(self):
-        assert self.p1.findall("Hello World") == ["Hello", "World"]
+        assert self.pattern.findall("Hello World") == []
+        assert self.pattern.findall("Hallo World") == ["Hallo"]
 
+
+class TestMatchALL:
+    p1 = MatchALL.compile(r"world", r"hello", flag=re.I)
+    p2 = MatchALL.compile(r"world", r"hello", flag=re.I, order=True)
+
+    def test_findall(self):
         assert self.p1.findall("Hello word") == []
+        assert self.p1.findall("Hello Hello World") == ["Hello", "Hello", "World"]
+        assert self.p1.findall("Hello Hello World Hello World") == ["Hello", "Hello", "World", "Hello", "World"]
+        assert self.p2.findall("Hello world") == []
+        assert self.p2.findall("World Hello World Hello") == ["World", "Hello", "World", "Hello"]
+        assert self.p2.findall("Hello Hello World Hello World Hello") == ["World", "Hello", "World", "Hello"]

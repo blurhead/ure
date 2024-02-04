@@ -78,10 +78,15 @@ class Base:
     def __or__(self, other: Any) -> PatternLike:
         return MatchAny.compile(self, other)
 
+    def __xor__(self, other: Any) -> PatternLike:
+        self = deepcopy(self)
+        self.p_deny = MatchAny.compile(self.p_deny, other)
+        return self
+
     def __sub__(self, other: Any) -> PatternLike:
-        new = deepcopy(self)
-        new.p_deny = MatchAny.compile(self.p_deny, other)
-        return new
+        self = deepcopy(self)
+        self.p_trim = MatchAny.compile(self.p_trim, other)
+        return self
 
     def findnext(self, string: str, pos: int = 0, endpos: int = sys.maxsize) -> Iterator[MatchLike]:
         raise NotImplementedError
@@ -133,22 +138,37 @@ class MatchAny(Base):
                 continue
 
     @classmethod
-    def compile(cls, *patterns: Any, p_trim: Any = _MATCH_NONE, flag: int = 0) -> Self:
-        self = cls(tuple(_compile(pattern, flag) for pattern in patterns))
-        self.p_trim = _compile(p_trim, flag)
-        return self
+    def compile(cls, *patterns: Any, flag: int = 0) -> Self:
+        return cls(tuple(_compile(pattern, flag) for pattern in patterns))
 
 
+@dataclass
 class MatchALL(MatchAny):
+    order: bool = False
+
     def findnext(self, string: str, pos: int = 0, endpos: int = sys.maxsize) -> Iterator[MatchLike]:
+        if not self.patterns:
+            return
         matches = []
-        matched_patterns = set()
+        patterns = list(self.patterns)
 
         for matched in super().findnext(string, pos, endpos):
-            matched_patterns.add(matched.re)
-            matches.append(matched)
+            if self.order:
+                if matched.re == patterns[0]:
+                    patterns.pop(0)
+                    matches.append(matched)
+                elif matches and matched.re == matches[-1].re:
+                    matches.append(matched)
+            else:
+                if matched.re in patterns:
+                    patterns.remove(matched.re)
+                matches.append(matched)
 
-            if matched_patterns.issuperset(self.patterns):
+            if not patterns:
                 yield from iter(matches)
+                patterns = list(self.patterns)
                 matches = []
-                matched_patterns = set()
+
+    @classmethod
+    def compile(cls, *patterns: Any, flag: int = 0, order: bool = False) -> Self:
+        return cls(tuple(_compile(pattern, flag) for pattern in patterns), order=order)
