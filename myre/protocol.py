@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import sys
 from typing import (
-    Any,
     AnyStr,
     Iterator,
     List,
     Literal,
     Optional,
-    Pattern,
     Protocol,
     Tuple,
     TypeVar,
@@ -21,46 +19,27 @@ _T = TypeVar("_T")
 
 @runtime_checkable
 class MatchLike(Protocol[AnyStr]):
-    def start(self, group: int = 0) -> int:
-        ...
+    re: PatternLike[AnyStr]
+    string: AnyStr
 
-    def end(self, group: int = 0) -> int:
-        ...
+    def start(self, group: int | str = 0) -> int: ...
 
-    def span(self, group: int = 0) -> Tuple[int, int]:
-        ...
+    def end(self, group: int | str = 0) -> int: ...
 
-    @property
-    def re(self) -> Pattern[AnyStr]:
-        ...
+    def span(self, group: int | str = 0) -> Tuple[int, int]: ...
 
     @overload
-    def group(self, __group: Literal[0] = 0) -> AnyStr:
-        ...
-
+    def group(self, __group: Literal[0] = 0) -> AnyStr: ...
     @overload
-    def group(self, __group: str | int) -> AnyStr | Any:
-        ...
+    def group(self, __group: str | int) -> AnyStr: ...
 
-    def group(self, __group: str | int = 0) -> AnyStr | Any:
-        ...
-
-    @overload
-    def groups(self) -> tuple[AnyStr | Any, ...]:
-        ...
-
-    @overload
-    def groups(self, default: _T) -> tuple[AnyStr | _T, ...]:
-        ...
+    def groups(self) -> tuple[AnyStr, ...]: ...
 
 
 @runtime_checkable
-class PatternLike(Protocol):
-    def search(self: "PatternLike", string: str, pos: int = 0, endpos: int = sys.maxsize) -> Optional[MatchLike]:
-        ...
+class PatternLike(Protocol[AnyStr]):
+    def search(self, string: str, pos: int = 0, endpos: int = sys.maxsize) -> Optional[MatchLike[AnyStr]]: ...
 
-    def findall(self, string: str, pos: int = 0, endpos: int = sys.maxsize) -> List[str]:
-        ...
+    def findall(self, string: str, pos: int = 0, endpos: int = sys.maxsize) -> List[AnyStr]: ...
 
-    def finditer(self, string: str, pos: int = 0, endpos: int = sys.maxsize) -> Iterator[MatchLike]:
-        ...
+    def finditer(self, string: str, pos: int = 0, endpos: int = sys.maxsize) -> Iterator[MatchLike[AnyStr]]: ...

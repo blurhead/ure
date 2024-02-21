@@ -6,11 +6,11 @@ import sys
 from copy import deepcopy
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Any, Iterator, List, NamedTuple, Optional, Set, Tuple, cast
+from typing import Any, Iterator, List, NamedTuple, Optional, Set, cast
 
-from typing_extensions import Self
+from typing_extensions import Self, final
 
-from myre.match import OffsetMatch
+from myre.match import ComposeMatch, MatchWithOffset
 from myre.protocol import MatchLike, PatternLike
 
 
@@ -47,8 +47,8 @@ class Trimmer:
             self.scopes.append(scope)
         return string
 
-    def restore(self, matcher: MatchLike) -> OffsetMatch:
-        start, end = matcher.start(), matcher.end()
+    def restore(self, string: str, hit: MatchLike) -> ComposeMatch:
+        start, end = hit.start(), hit.end()
         for s, e in self.scopes:
             if s <= start:
                 start += e - s
@@ -56,15 +56,15 @@ class Trimmer:
                 end += e - s
             else:
                 break
-        if isinstance(matcher, OffsetMatch):
-            matcher = matcher._match
-        elif not isinstance(matcher, re.Match):
-            raise TypeError(f"{matcher} is not a valid match")
-        return OffsetMatch(matcher, start - matcher.start(), end - matcher.end())
+        if isinstance(hit, ComposeMatch):
+            return ComposeMatch(hit.hits, hit.re, string)
+        if isinstance(hit, re.Match):
+            return ComposeMatch((MatchWithOffset(hit, (start - hit.start(), end - hit.end())),), hit.re, string)
+        raise TypeError(f"{hit} is not a valid match")
 
 
-_MATCH_NONE = re.compile(r"(?!.?)")
-_MATCH_ALL = re.compile(r".?")
+_MATCH_NONE: PatternLike = cast(PatternLike, re.compile(r"(?!.?)"))
+_MATCH_ALL: PatternLike = cast(PatternLike, re.compile(r".?"))
 
 
 @dataclass
@@ -88,54 +88,55 @@ class Base:
         self.p_trim = MatchAny.compile(self.p_trim, other)
         return self
 
-    def findnext(self, string: str, pos: int = 0, endpos: int = sys.maxsize) -> Iterator[MatchLike]:
+    def __finditer__(
+        self, string: str, pos: int = 0, endpos: int = sys.maxsize
+    ) -> Iterator[tuple[MatchLike, PatternLike]]:
         raise NotImplementedError
 
-    def finditer(self, string: str, pos: int = 0, endpos: int = sys.maxsize) -> Iterator[OffsetMatch]:
+    @final
+    def finditer(self, string: str, pos: int = 0, endpos: int = sys.maxsize) -> Iterator[MatchLike]:
         trimmer = Trimmer(self.p_trim)
-        string = trimmer.remove(string, pos, endpos)
-        for match in self.findnext(string, pos, endpos):
-            if self.p_deny.search(match.group()):
-                continue
-            yield trimmer.restore(match)
+        trimmed = trimmer.remove(string, pos, endpos)
+        if self.p_deny.search(trimmed, pos, endpos):
+            return
+        for hit, _ in self.__finditer__(trimmed, pos, endpos):
+            yield cast(MatchLike, trimmer.restore(string, hit))
 
     def findall(self, string: str, pos: int = 0, endpos: int = sys.maxsize) -> List[str]:
         return [match.group() for match in self.finditer(string, pos, endpos)]
 
-    def search(self, string: str, pos: int = 0, endpos: int = sys.maxsize) -> Optional[OffsetMatch]:
+    def search(self, string: str, pos: int = 0, endpos: int = sys.maxsize) -> Optional[MatchLike]:
         return next(self.finditer(string, pos, endpos), None)
 
 
 @dataclass
 class MatchAny(Base):
-    patterns: Tuple[PatternLike, ...]
+    patterns: tuple[PatternLike, ...]
 
-    def findnext(self, string: str, pos: int = 0, endpos: int = sys.maxsize) -> Iterator[MatchLike]:
-        pq: List[Tuple[int, MatchLike, Iterator[MatchLike]]] = []
+    def __finditer__(
+        self, string: str, pos: int = 0, endpos: int = sys.maxsize
+    ) -> Iterator[tuple[MatchLike, PatternLike]]:
+        pq: List[tuple[int, MatchLike, Iterator[MatchLike], PatternLike]] = []
         indices: Set[int] = set()
 
         for pattern in self.patterns:
             follow = pattern.finditer(string, pos, endpos)
-            try:
-                matcher = next(follow)
-                if any(i in indices for i in range(*matcher.span())):
+            while hit := next(follow, None):
+                if any(i in indices for i in range(*hit.span())):
                     continue
-                indices.update(range(*matcher.span()))
-                heapq.heappush(pq, (matcher.start(), matcher, follow))
-            except StopIteration:
-                continue
+                indices.update(range(*hit.span()))
+                heapq.heappush(pq, (hit.start(), hit, follow, pattern))
+                break
 
         while pq:
-            _, matcher, follow = heapq.heappop(pq)
-            yield matcher
-            try:
-                matcher = next(follow)
-                if any(i in indices for i in range(*matcher.span())):
+            _, hit, follow, pattern = heapq.heappop(pq)
+            yield hit, pattern
+            while hit := next(follow, None):
+                if any(i in indices for i in range(*hit.span())):
                     continue
-                indices.update(range(*matcher.span()))
-                heapq.heappush(pq, (matcher.start(), matcher, follow))
-            except StopIteration:
-                continue
+                indices.update(range(*hit.span()))
+                heapq.heappush(pq, (hit.start(), hit, follow, pattern))
+                break
 
     @classmethod
     def compile(cls, *patterns: Any, flag: int = 0) -> Self:
@@ -144,31 +145,57 @@ class MatchAny(Base):
 
 @dataclass
 class MatchALL(MatchAny):
-    order: bool = False
-
-    def findnext(self, string: str, pos: int = 0, endpos: int = sys.maxsize) -> Iterator[MatchLike]:
+    def __finditer__(
+        self, string: str, pos: int = 0, endpos: int = sys.maxsize
+    ) -> Iterator[tuple[MatchLike, PatternLike]]:
         if not self.patterns:
             return
-        matches = []
+        hits: list[MatchWithOffset] = []
         patterns = list(self.patterns)
 
-        for matched in super().findnext(string, pos, endpos):
-            if self.order:
-                if matched.re == patterns[0]:
-                    patterns.pop(0)
-                    matches.append(matched)
-                elif matches and matched.re == matches[-1].re:
-                    matches.append(matched)
-            else:
-                if matched.re in patterns:
-                    patterns.remove(matched.re)
-                matches.append(matched)
+        for hit, pattern in super().__finditer__(string, pos, endpos):
+            if pattern not in patterns:
+                continue
+            patterns.remove(pattern)
+            if isinstance(hit, re.Match):
+                hits.append(MatchWithOffset(hit))
+            elif isinstance(hit, ComposeMatch):
+                hits.extend(hit.hits)
 
             if not patterns:
-                yield from iter(matches)
+                yield cast(MatchLike, ComposeMatch(tuple(hits), self, string)), self
                 patterns = list(self.patterns)
-                matches = []
+                hits = []
 
-    @classmethod
-    def compile(cls, *patterns: Any, flag: int = 0, order: bool = False) -> Self:
-        return cls(tuple(_compile(pattern, flag) for pattern in patterns), order=order)
+
+@dataclass
+class MatchSeq(MatchAny):
+    def __finditer__(
+        self, string: str, pos: int = 0, endpos: int = sys.maxsize
+    ) -> Iterator[tuple[MatchLike, PatternLike]]:
+        if not self.patterns:
+            return
+        hits: list[MatchWithOffset] = []
+
+        index = 0
+        for hit, pattern in super().__finditer__(string, pos, endpos):
+            if pattern == self.patterns[index]:
+                index += 1
+                if isinstance(hit, re.Match):
+                    hits.append(MatchWithOffset(hit))
+                elif isinstance(hit, ComposeMatch):
+                    hits.extend(hit.hits)
+
+            if index == len(self.patterns):
+                yield cast(MatchLike, ComposeMatch(tuple(hits), self, string)), self
+                index = 0
+                hits = []
+
+
+if __name__ == "__main__":
+    pattern = MatchALL.compile(MatchAny.compile("(abc)", "(bcd)"), "(def.)", "(123)")
+    for hit in pattern.finditer("abc deff123 bcd , abccdef1123"):
+        print(hit.group(2))
+    # pattern = MatchAny.compile("(?P<a>aaa)", "(?P<a>bbb)", "(?P<a>ccc)")
+    # for hit in pattern.finditer("aaa aaa bbb aaa ccc bbb aaa"):
+    # print(hit.span("a"), hit.group("a"), hit.span(1), hit.group(1))

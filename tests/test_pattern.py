@@ -23,18 +23,14 @@ class TestMatchAnySub:
     pattern = MatchAny.compile(r"hello", flag=re.I) - r"[$]"
 
     def test_findall(self):
-        for text in [
-            "Hell$o World",
-        ]:
-            assert self.pattern.findall(text) == ["Hello"]
+        for text in ["Hell$o World"]:
+            for hit in self.pattern.finditer(text):
+                assert hit.group() == "Hell$o"
 
     def test_position(self):
-        for text in [
-            "Hell$o World",
-        ]:
-            for matcher in self.pattern.finditer(text):
-                assert matcher.group() == "Hello"
-                assert text[matcher.start() : matcher.end()] == "Hell$o"
+        for text in ["Hell$o World"]:
+            for hit in self.pattern.finditer(text):
+                assert text[hit.start() : hit.end()] == "Hell$o"
 
 
 class TestMatchAnyXor:
@@ -47,12 +43,8 @@ class TestMatchAnyXor:
 
 class TestMatchALL:
     p1 = MatchALL.compile(r"world", r"hello", flag=re.I)
-    p2 = MatchALL.compile(r"world", r"hello", flag=re.I, order=True)
 
     def test_findall(self):
         assert self.p1.findall("Hello word") == []
-        assert self.p1.findall("Hello Hello World") == ["Hello", "Hello", "World"]
-        assert self.p1.findall("Hello Hello World Hello World") == ["Hello", "Hello", "World", "Hello", "World"]
-        assert self.p2.findall("Hello world") == []
-        assert self.p2.findall("World Hello World Hello") == ["World", "Hello", "World", "Hello"]
-        assert self.p2.findall("Hello Hello World Hello World Hello") == ["World", "Hello", "World", "Hello"]
+        assert self.p1.findall("Hello Hello World") == ["Hello Hello World"]
+        assert self.p1.findall("Hello Hello World Hello World") == ["Hello Hello World", "Hello World"]

@@ -1,89 +1,99 @@
 from __future__ import annotations
 
 import re
+from contextlib import suppress
 from dataclasses import dataclass
-from typing import Any, AnyStr, Generic, Literal, Pattern, Tuple, TypeVar, overload
+from typing import Any, AnyStr, Generic, TypeVar
 
-from myre.protocol import MatchLike
+from myre.protocol import MatchLike, PatternLike
 
 _T = TypeVar("_T")
 
 
-@dataclass
-class OffsetMatch(Generic[AnyStr]):
-    _match: re.Match[AnyStr]
-    _start_offset: int
-    _end_offset: int
+@dataclass(frozen=True)
+class MatchWithOffset(Generic[AnyStr]):
+    match: re.Match[AnyStr]
+    offset: tuple[int, int] = (0, 0)
 
-    def start(self, group: int = 0) -> int:
-        return self._match.start(group) + self._start_offset
+    def start(self, group: int | str = 0) -> int:
+        return self.match.start(group) + self.offset[0]
 
-    def end(self, group: int = 0) -> int:
-        return self._match.end(group) + self._end_offset
+    def end(self, group: int | str = 0) -> int:
+        return self.match.end(group) + self.offset[1]
 
-    def span(self, group: int = 0) -> Tuple[int, int]:
+    def span(self, group: int | str = 0) -> tuple[int, int]:
         return (self.start(group), self.end(group))
 
+
+@dataclass
+class ComposeMatch(Generic[AnyStr]):
+    _hits: tuple[MatchWithOffset[AnyStr], ...]
+    _re: PatternLike
+    _string: AnyStr
+
     @property
-    def re(self) -> Pattern[AnyStr]:
-        return self._match.re
+    def hits(self):
+        return self._hits
 
-    @overload
-    def group(self, __group: Literal[0] = 0) -> AnyStr:
-        ...
+    def start(self, group: int | str = 0) -> int:
+        return self.span(group)[0]
 
-    @overload
-    def group(self, __group: str | int) -> AnyStr | Any:
-        ...
+    def end(self, group: int | str = 0) -> int:
+        return self.span(group)[-1]
 
-    def group(self, __group: str | int = 0) -> AnyStr | Any:
-        return self._match.group(__group)
+    def span(self, group: int | str = 0) -> tuple[int, int]:
+        if group == 0:
+            start = self._hits[0].start(group)
+            end = self._hits[-1].end(group)
+            return start, end
+        if isinstance(group, str):
+            for hit in self._hits:
+                with suppress(IndexError):
+                    return hit.span(group)
+        elif isinstance(group, int):
+            start = 0
+            for hit in self._hits:
+                while start < group:
+                    try:
+                        span = hit.span(start + 1)
+                    except IndexError as e:
+                        group -= start
+                        if group == 0:
+                            raise IndexError("no such group") from e
+                        start = 0
+                        break
+                    if start + 1 == group:
+                        return span
+                    start += 1
+        raise IndexError("no such group")
 
-    @overload
-    def groups(self) -> tuple[AnyStr | Any, ...]:
-        ...
+    @property
+    def re(self) -> PatternLike[AnyStr]:
+        return self._re
 
-    @overload
-    def groups(self, default: _T) -> tuple[AnyStr | _T, ...]:
-        ...
+    @property
+    def string(self) -> AnyStr:
+        return self._string
 
-    def groups(self, default=None):
-        return self._match.groups(default)
+    def groups(self) -> tuple[AnyStr, ...]:
+        groups: tuple[AnyStr, ...] = ()
+        for hit in self._hits:
+            index = 1
+            while True:
+                try:
+                    groups += (hit.match.group(index),)
+                except IndexError:
+                    break
+                index += 1
+        return groups
 
-    def groupdict(self, default=None):
-        return self._match.groupdict(default)
-
-    def expand(self, template):
-        return self._match.expand(template)
+    def group(self, __group: str | int = 0) -> AnyStr:
+        return self._string[self.start(__group) : self.end(__group)]
 
     def __repr__(self):
-        return f"<myre.OffsetMatch object; span={self.span()}, match={self.group()})"
+        return f"<myre.ComposeMatch(re={self.re!r}, string={self.string!r} object; span={self.span()}, match={self.group()})"
 
     def __eq__(self, other: Any):
         if isinstance(other, (MatchLike, re.Match)):
-            return self.span() == other.span()
+            return self.span() == other.span() and self.string == other.string
         return False
-
-    # def pos(self):
-    #     return self._match.pos
-
-    # def endpos(self):
-    #     return self._match.endpos
-
-    # def lastindex(self):
-    #     return self._match.lastindex
-
-    # def lastgroup(self):
-    #     return self._match.lastgroup
-
-    # def regs(self):
-    #     return tuple((start + self._start_offset, end + self._end_offset) for start, end in self._match.regs)
-
-    # def re(self):
-    #     return self._match.re
-
-    # def string(self):
-    #     return self._match.string
-
-    # def __copy__(self):
-    #     return OffsetMatch(self._match, self._start_offset, self._end_offset)
