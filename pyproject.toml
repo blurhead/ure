@@ -1,30 +1,30 @@
-[tool.poetry]
-authors = ["blurhead <blurhead@outlook.com>"]
-description = "Human Readable Regular Expression"
-license = "MIT"
+[project]
 name = "myre"
+version = "0.0.8"
+description = "Human Readable Regular Expression"
 readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "blurhead", email = "blurhead@outlook.com"}
+]
 repository = "https://github.com/blurhead/myre"
-version = "0.0.7"
 
-[[tool.poetry.source]]
-name = "default"
-priority = "primary"
-url = "https://pypi.tuna.tsinghua.edu.cn/simple/"
+dependencies = [
+    "typing-extensions>=4.9.0",
+]
 
-[tool.poetry.dependencies]
-python = "^3.10"
-typing-extensions = "^4.9.0"
-
-[tool.poetry.group.dev.dependencies]
-mypy = "^1.0"
-pre-commit = "^3.0"
-pytest = "^8.0"
-ruff = "*"
+[project.optional-dependencies]
+dev = [
+    "mypy>=1.0",
+    "pre-commit>=3.0",
+    "pytest>=8.0",
+    "ruff>=0.1.0",
+]
 
 [build-system]
-build-backend = "poetry.core.masonry.api"
-requires = ["poetry-core"]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [tool.ruff]
 # Allow unused variables when underscore-prefixed.
@@ -32,7 +32,7 @@ builtins = ["_"]
 exclude = ["tests"]
 line-length = 120
 target-version = "py310"
-# Allow autofix for all enabled rules (when `--fix`) is provided.
+
 [tool.ruff.lint]
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 ignore = [

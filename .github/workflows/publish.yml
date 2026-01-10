@@ -12,22 +12,22 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        python-version: ["3.8"]
-        poetry-version: ["1.7.1"]
+        python-version: ["3.10"]
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: "0"
 
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-
-      - uses: abatilo/actions-poetry@v2.1.6
-        with:
-          poetry-version: ${{ matrix.poetry-version }}
 
       - name: Create Release Branch
         run: |
@@ -35,10 +35,19 @@ jobs:
           git push origin release/$GITHUB_REF_NAME
 
       - name: Install dependencies
-        run: poetry build
+        run: |
+          uv sync --extra dev
 
-      - name: Build and publish package
+      - name: Run tests
+        run: |
+          uv run pytest tests/ -v
+
+      - name: Build package
+        run: |
+          uv build
+
+      - name: Publish to PyPI
         env:
           PYPI_TOKEN: ${{ secrets.MYRE }}
-        run:
-          poetry publish --username=__token__ --password=$PYPI_TOKEN
+        run: |
+          uv publish --username __token__ --password $PYPI_TOKEN
