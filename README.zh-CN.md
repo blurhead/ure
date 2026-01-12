@@ -4,6 +4,8 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Version: 0.0.8](https://img.shields.io/badge/version-0.0.8-orange.svg)](https://github.com/blurhead/myre)
 
+**语言:** [English](README.md) | [简体中文](README.zh-CN.md)
+
 **myre** 是一个可组合的正则表达式库，将正则模式转化为支持代数运算的一等对象。它提供了一种人类友好的方式来组合、过滤和转换Python中的模式匹配，同时保持与标准 `re` 模块接口的完全兼容性。
 
 ## 特性

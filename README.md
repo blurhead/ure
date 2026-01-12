@@ -4,6 +4,8 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Version: 0.0.8](https://img.shields.io/badge/version-0.0.8-orange.svg)](https://github.com/blurhead/myre)
 
+**Language:** [English](README.md) | [简体中文](README.zh-CN.md)
+
 **myre** is a composable regular expression library that transforms regex patterns into first-class objects supporting algebraic operations. It provides a human-friendly way to combine, filter, and transform pattern matching in Python, maintaining full compatibility with the standard `re` module interface.
 
 ## Features
