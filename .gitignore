@@ -162,6 +162,7 @@ cython_debug/
 .idea/
 .vscode/
 .fleet/
+.claude/
 poetry.lock
 .python-version
 
