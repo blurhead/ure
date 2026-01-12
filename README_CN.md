@@ -2,13 +2,13 @@
 
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Version: 0.0.7](https://img.shields.io/badge/version-0.0.7-orange.svg)](https://github.com/blurhead/myre)
+[![Version: 0.0.8](https://img.shields.io/badge/version-0.0.8-orange.svg)](https://github.com/blurhead/myre)
 
 **myre** 是一个可组合的正则表达式库，将正则模式转化为支持代数运算的一等对象。它提供了一种人类友好的方式来组合、过滤和转换Python中的模式匹配，同时保持与标准 `re` 模块接口的完全兼容性。
 
 ## 特性
 
-- **代数运算**: 使用 `|` (或)、`&` (且)、`^` (异或/排除)、`@` (遮蔽) 组合模式
+- **代数运算**: 使用 `|` (或)、`&` (且)、`+` (序列)、`/` (分割)、`^` (异或/排除)、`@` (遮蔽) 组合模式
 - **类型安全**: 基于Protocol的设计，完整的类型提示
 - **兼容 re**: 可作为标准 `re` 模模式的替代品
 - **可组合**: 模式是不可变对象，可以像数学集合一样组合
@@ -40,6 +40,11 @@ for match in pattern.finditer("hello world"):
 pattern = myre.compile(r"hello") + myre.compile(r"world")
 for match in pattern.finditer("hello world"):
     print(match.group())  # 输出: hello world
+
+# 分割运算：按分隔符分割，在每个片段中匹配
+pattern = myre.compile(r"\d{2}") / r"[,-]"
+for match in pattern.finditer("12,34-56"):
+    print(match.group())  # 输出: 12, 34, 56 (每个都有正确的位置)
 
 # 异或运算：匹配模式但排除另一个
 pattern = myre.compile(r"h\wllo") ^ r"ell"
@@ -86,6 +91,7 @@ for match in pattern.finditer("hello world"):
 | `\|` | 或 | 匹配任意模式 | `p1 \| p2` → MatchAny(p1, p2) |
 | `&` | 且 | 匹配所有模式 | `p1 & p2` → MatchALL(p1, p2) |
 | `+` | 序列 | 按顺序匹配模式 | `p1 + p2` → MatchSeq(p1, p2) |
+| `/` | 分割 | 按分隔符分割，在片段中匹配 | `p1 / p2` → SplitMatch(p1, p2) |
 | `^` | 异或 | 匹配模式但排除包含拒绝模式的内容 | `p1 ^ p2` → 匹配 p1，排除包含 p2 的结果 |
 | `@` | 遮蔽 | 用占位符遮蔽模式 | `p1 @ (mask, placeholder)` → 用占位符替换 mask，匹配 p1 |
 
@@ -226,7 +232,7 @@ for match in pattern.finditer("Hello, world! Hello."):
 
 ```bash
 # 安装依赖
-poetry install
+uv sync --extra dev
 
 # 运行测试
 pytest tests/

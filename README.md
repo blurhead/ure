@@ -2,13 +2,13 @@
 
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Version: 0.0.7](https://img.shields.io/badge/version-0.0.7-orange.svg)](https://github.com/blurhead/myre)
+[![Version: 0.0.8](https://img.shields.io/badge/version-0.0.8-orange.svg)](https://github.com/blurhead/myre)
 
 **myre** is a composable regular expression library that transforms regex patterns into first-class objects supporting algebraic operations. It provides a human-friendly way to combine, filter, and transform pattern matching in Python, maintaining full compatibility with the standard `re` module interface.
 
 ## Features
 
-- **Algebraic Operations**: Combine patterns using `|` (OR), `&` (AND), `^` (XOR/EXCLUDE), `@` (MASK)
+- **Algebraic Operations**: Combine patterns using `|` (OR), `&` (AND), `+` (SEQUENCE), `/` (SPLIT), `^` (XOR/EXCLUDE), `@` (MASK)
 - **Type-Safe**: Protocol-based design with full type hints
 - **re-Compatible**: Drop-in replacement for standard `re` module patterns
 - **Composable**: Patterns are immutable objects that can be combined like mathematical sets
@@ -40,6 +40,11 @@ for match in pattern.finditer("hello world"):
 pattern = myre.compile(r"hello") + myre.compile(r"world")
 for match in pattern.finditer("hello world"):
     print(match.group())  # Prints: hello world
+
+# SPLIT operation: split by delimiter, match pattern in each segment
+pattern = myre.compile(r"\d{2}") / r"[,-]"
+for match in pattern.finditer("12,34-56"):
+    print(match.group())  # Prints: 12, 34, 56 (each with correct position)
 
 # XOR operation: match pattern but exclude another
 pattern = myre.compile(r"h\wllo") ^ r"ell"
@@ -86,6 +91,7 @@ for match in pattern.finditer("hello world"):
 | `\|` | OR | Match any pattern | `p1 \| p2` → MatchAny(p1, p2) |
 | `&` | AND | Match all patterns | `p1 & p2` → MatchALL(p1, p2) |
 | `+` | SEQUENCE | Match patterns in order | `p1 + p2` → MatchSeq(p1, p2) |
+| `/` | SPLIT | Split by delimiter, match in segments | `p1 / p2` → SplitMatch(p1, p2) |
 | `^` | XOR | Exclude matches containing deny pattern | `p1 ^ p2` → Match p1, exclude if text contains p2 |
 | `@` | MASK | Mask patterns with placeholders | `p1 @ (mask, placeholder)` → Replace mask with placeholder, match p1 |
 
@@ -226,7 +232,7 @@ The library is built on three architectural layers:
 
 ```bash
 # Install dependencies
-poetry install
+uv sync --extra dev
 
 # Run tests
 pytest tests/
